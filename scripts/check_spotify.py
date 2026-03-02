@@ -26,8 +26,8 @@ from dotenv import load_dotenv
 # Load .env from project root before importing anything that reads env vars
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from echostream.spotify.config import SpotifyConfig
 from echostream.spotify.client import SpotifyClient
+from echostream.spotify.config import SpotifyConfig
 
 
 def main() -> None:

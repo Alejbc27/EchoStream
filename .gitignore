@@ -20,3 +20,7 @@ terraform.tfstate.backup
 .DS_Store
 Thumbs.db
 2026*.md
+
+# Airflow
+airflow-logs/
+logs/

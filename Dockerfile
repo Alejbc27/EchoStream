@@ -45,6 +45,11 @@ COPY --from=builder /app/src /app/src
 # Add the venv's bin to PATH so `python` resolves to the venv's Python
 ENV PATH="/app/.venv/bin:$PATH"
 
+# Tell Python where to find our source code (src-layout)
+# Without this, `python -m echostream.main` fails with "No module named 'echostream'"
+# because Python looks in /app but the package lives in /app/src/echostream/
+ENV PYTHONPATH="/app/src"
+
 # Cloud Run sets these, but we provide sensible defaults for local testing
 ENV SPOTIFY_OPEN_BROWSER="false"
 ENV SPOTIFY_CACHE_PATH="/tmp/.spotify_cache"

@@ -175,6 +175,14 @@ resource "google_cloud_run_v2_job" "extractor" {
           value = "http://localhost:8888/callback"
         }
 
+        # Needed by main.py to call the Secret Manager API.
+        # main.py reads GOOGLE_CLOUD_PROJECT to build the secret resource path:
+        #   projects/<project_id>/secrets/spotify-cache-token/versions/latest
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
+        }
+
         # Secrets mounted as environment variables at runtime
         env {
           name = "SPOTIFY_CLIENT_ID"

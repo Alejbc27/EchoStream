@@ -1,0 +1,42 @@
+[project]
+name = "echostream"
+version = "0.1.0"
+description = "Agentic Data Lakehouse for Spotify listening history"
+requires-python = ">=3.11"
+
+# ── Runtime dependencies ────────────────────────────────────────────────────
+# spotipy      → wrapper oficial de Python para la Spotify Web API (OAuth2, endpoints)
+# python-dotenv → lee el archivo .env y mete las variables en os.environ automáticamente
+# polars       → librería de DataFrames en Rust, 10-20x más rápida que pandas (usaremos en Phase 2)
+# pyarrow      → soporte para formato Parquet (archivos columnar comprimidos, usaremos en Phase 2)
+dependencies = [
+    "spotipy>=2.24.0",
+    "python-dotenv>=1.0.0",
+    "polars>=1.0.0",
+    "pyarrow>=14.0.0",
+]
+
+# ── Dev dependencies (solo para desarrollo, no en producción) ───────────────
+# pytest       → framework para escribir y ejecutar tests
+# pytest-mock  → facilita crear "mocks" (objetos falsos) en tests
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.12.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# ── Ruff (linter + formatter) ───────────────────────────────────────────────
+# E, F = errores de estilo y bugs comunes de Python
+# I   = ordenar imports automáticamente
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+# ── Pytest ──────────────────────────────────────────────────────────────────
+# Le decimos a pytest dónde buscar el código fuente (src layout)
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,32 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+# Estos archivos se generan automáticamente y no tienen valor en git.
+# Cada persona/máquina los genera al instalar o ejecutar el proyecto.
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+dist/
+*.egg-info/
+.ruff_cache/
+
+# ── Secretos ─────────────────────────────────────────────────────────────────
+# NUNCA subas estas a git. Contienen contraseñas y tokens de API.
+# Si alguien clona el repo y tiene tu .env, puede usar tu cuenta de Spotify.
+.env
+.spotify_cache
+
+# ── Terraform ────────────────────────────────────────────────────────────────
+# .terraform/           → plugins descargados (muy pesados, se regeneran con `terraform init`)
+# terraform.tfstate     → estado actual de tu infra (puede contener datos sensibles)
+# *.tfvars              → variables con valores reales (project_id, etc.)
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
+*.tfvars
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+2026*.md

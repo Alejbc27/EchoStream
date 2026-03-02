@@ -15,6 +15,10 @@ dependencies = [
     "polars>=1.0.0",
     "pyarrow>=14.0.0",
     "google-cloud-storage>=2.14.0",
+    # Lee los secretos de Spotify (client_id, client_secret, cache token)
+    # desde Google Cloud Secret Manager cuando el job corre en Cloud Run.
+    # Localmente NO hace falta (los secretos están en .env).
+    "google-cloud-secret-manager>=2.0.0",
 ]
 
 # ── Dev dependencies (solo para desarrollo, no en producción) ───────────────
@@ -29,6 +33,15 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# ── Hatchling build config ───────────────────────────────────────────────────
+# WHY THIS SECTION?
+# Nuestro código está en src/echostream/ (src-layout).
+# Hatchling por defecto busca una carpeta llamada "echostream" en la raíz.
+# Sin esta config, el Docker build falla con "Unable to determine which files to ship".
+# Le decimos explícitamente: "el paquete echostream está dentro de src/".
+[tool.hatch.build.targets.wheel]
+packages = ["src/echostream"]
 
 # ── Ruff (linter + formatter) ───────────────────────────────────────────────
 # E, F = errores de estilo y bugs comunes de Python

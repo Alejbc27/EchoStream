@@ -28,7 +28,11 @@ Storage format — NDJSON (Newline-Delimited JSON):
   Also, if you open the file in a terminal you can grep/jq one line at a time.
 
 GCS path layout (Hive partitioning):
-  gs://<bucket>/spotify/YYYY/MM/DD/batch_<unix_ts>.json
+  gs://<bucket>/spotify/<data_type>/YYYY/MM/DD/batch_<unix_ts>.json
+
+  data_type = "recent" or "top/<time_range>"
+  This separation lets BigQuery external tables scan only recent OR top data.
+
   Why partition by date? Tools like BigQuery, Spark, Polars can SKIP entire
   date partitions when querying (e.g. "only load January 2026"). Much faster.
 """
@@ -84,6 +88,10 @@ class SpotifyExtractor:
     # Public API
     # ──────────────────────────────────────────────────────────────────────────
 
+    # Spotify supports these time ranges for top tracks/artists.
+    # We extract all three to capture different listening perspectives.
+    VALID_TIME_RANGES = ("short_term", "medium_term", "long_term")
+
     def extract_recent(self, limit: int = 50) -> dict:
         """
         Fetch recently-played tracks and save them to GCS.
@@ -91,30 +99,12 @@ class SpotifyExtractor:
         Returns a metadata dict so callers (e.g. an Airflow task) know what
         was produced without having to re-read the file.
 
-        Returns
-        -------
-        {
-            "total_tracks": int,          # how many tracks were saved
-            "gcs_path":     str,          # full gs:// URL of the file
-            "extracted_at": str,          # ISO-8601 UTC timestamp
-            "partition":    str,          # "YYYY/MM/DD" — useful for downstream steps
-        }
-
-        Raises
-        ------
-        RuntimeError if the Spotify call or GCS upload fails.
-        We intentionally let the error bubble up: the caller (Airflow, Cloud
-        Scheduler, etc.) should decide whether to retry or alert.
+        GCS path: spotify/recent/YYYY/MM/DD/batch_<unix_ts>.json
         """
         extracted_at = datetime.now(UTC)
-
-        # ── 1. Fetch from Spotify ────────────────────────────────────────────
         tracks = self._client.get_recently_played(limit=limit)
 
         if not tracks:
-            # Return early rather than uploading an empty file.
-            # An empty file would look like a successful extraction and confuse
-            # downstream jobs that check file size / row count.
             return {
                 "total_tracks": 0,
                 "gcs_path": None,
@@ -122,8 +112,7 @@ class SpotifyExtractor:
                 "partition": _date_partition(extracted_at),
             }
 
-        # ── 2. Save to GCS ───────────────────────────────────────────────────
-        gcs_path = self._save_to_gcs(tracks, extracted_at)
+        gcs_path = self._save_to_gcs(tracks, extracted_at, data_type="recent")
 
         return {
             "total_tracks": len(tracks),
@@ -132,51 +121,93 @@ class SpotifyExtractor:
             "partition": _date_partition(extracted_at),
         }
 
+    def extract_top(self, time_range: str = "medium_term", limit: int = 50) -> dict:
+        """
+        Fetch top tracks for a time range and save them to GCS.
+
+        time_range: "short_term" (~4 weeks), "medium_term" (~6 months),
+                    "long_term" (several years).
+        GCS path: spotify/top/<time_range>/YYYY/MM/DD/batch_<unix_ts>.json
+        """
+        if time_range not in self.VALID_TIME_RANGES:
+            raise ValueError(
+                f"Invalid time_range '{time_range}'. "
+                f"Must be one of: {', '.join(self.VALID_TIME_RANGES)}"
+            )
+
+        extracted_at = datetime.now(UTC)
+        tracks = self._client.get_top_tracks(limit=limit, time_range=time_range)
+
+        if not tracks:
+            return {
+                "total_tracks": 0,
+                "gcs_path": None,
+                "extracted_at": extracted_at.isoformat(),
+                "partition": _date_partition(extracted_at),
+                "time_range": time_range,
+            }
+
+        gcs_path = self._save_to_gcs(
+            tracks, extracted_at, data_type=f"top/{time_range}"
+        )
+
+        return {
+            "total_tracks": len(tracks),
+            "gcs_path": gcs_path,
+            "extracted_at": extracted_at.isoformat(),
+            "partition": _date_partition(extracted_at),
+            "time_range": time_range,
+        }
+
+    def extract_all(self) -> list[dict]:
+        """
+        Run a full extraction cycle: recent plays + top tracks for all 3 time
+        ranges. This is what the Cloud Run job calls every 2 hours.
+
+        Returns a list of 4 result dicts (one per extraction).
+        """
+        results = []
+        results.append(self.extract_recent(limit=50))
+        for time_range in self.VALID_TIME_RANGES:
+            results.append(self.extract_top(time_range=time_range, limit=50))
+        return results
+
     # ──────────────────────────────────────────────────────────────────────────
     # Private helpers
     # ──────────────────────────────────────────────────────────────────────────
 
-    def _save_to_gcs(self, tracks: list[dict], timestamp: datetime) -> str:
+    def _save_to_gcs(
+        self, tracks: list[dict], timestamp: datetime, data_type: str = "recent"
+    ) -> str:
         """
         Serialize *tracks* as NDJSON and upload to GCS.
 
         Parameters
         ----------
         tracks:
-            List of track dicts as returned by SpotifyClient.get_recently_played().
+            List of track dicts from the Spotify API.
         timestamp:
-            The moment of extraction — used to build the date-partitioned path
-            and the filename.  Passing it in (instead of calling datetime.now()
-            here) ensures the path is consistent with extract_recent()'s metadata.
+            Extraction moment — used for path partitioning and filename.
+        data_type:
+            Subdirectory under spotify/. Examples: "recent", "top/short_term".
+            This separates different extraction types in GCS so BigQuery
+            external tables can target each one independently.
 
         Returns
         -------
-        The full gs:// path, e.g.:
-            "gs://my-bucket/spotify/2026/01/31/batch_1738281600.json"
+        Full gs:// path, e.g.:
+            "gs://my-bucket/spotify/recent/2026/01/31/batch_1738281600.json"
         """
-        # ── Build the object path ────────────────────────────────────────────
-        # Object paths in GCS look like file paths but GCS has no real folders —
-        # the slash is just part of the object name. However, the GCS UI and
-        # BigQuery both treat slashes as folder separators, so the convention works.
         unix_ts = int(timestamp.timestamp())
         partition = _date_partition(timestamp)
-        object_name = f"spotify/{partition}/batch_{unix_ts}.json"
+        object_name = f"spotify/{data_type}/{partition}/batch_{unix_ts}.json"
 
-        # ── Serialize as NDJSON ──────────────────────────────────────────────
-        # json.dumps() converts a Python dict → a JSON string.
-        # "\n".join(...) puts each track on its own line.
-        # We add a trailing newline for POSIX compliance (some tools expect it).
         ndjson_content = "\n".join(json.dumps(track) for track in tracks) + "\n"
 
-        # ── Upload ───────────────────────────────────────────────────────────
-        # blob = a "pointer" to a GCS object (file).  Creating the blob object
-        # doesn't make a network call yet — upload_from_string() does.
         blob = self._bucket.blob(object_name)
         blob.upload_from_string(
             ndjson_content,
             content_type="application/x-ndjson",
-            # content_type is optional but good practice: GCS stores it as
-            # metadata and some tools (like Cloud Functions triggers) use it.
         )
 
         return f"gs://{self._bucket.name}/{object_name}"

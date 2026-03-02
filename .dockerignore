@@ -1,0 +1,20 @@
+# .dockerignore — files excluded from the Docker build context.
+# Keeps the image small and prevents secrets from leaking into the image.
+.venv/
+.git/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+.env
+.env.template
+.spotify_cache
+.DS_Store
+terraform/
+tests/
+scripts/
+docs/
+*.md
+.vscode/
+.gitignore
+.gitattributes

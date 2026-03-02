@@ -29,3 +29,20 @@ output "raw_bucket_url" {
   description = "gs:// URL for the Raw bucket — use this in Python code"
   value       = "gs://${google_storage_bucket.raw.name}"
 }
+
+# ── Cloud Run outputs ───────────────────────────────────────────────────────
+
+output "artifact_registry_url" {
+  description = "Docker registry URL — use this in docker push commands"
+  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.echostream.repository_id}"
+}
+
+output "cloud_run_job_name" {
+  description = "Name of the Cloud Run extraction job"
+  value       = google_cloud_run_v2_job.extractor.name
+}
+
+output "extractor_service_account" {
+  description = "Email of the service account used by the extractor job"
+  value       = google_service_account.extractor.email
+}

@@ -48,7 +48,7 @@ class SpotifyClient:
             redirect_uri=config.redirect_uri,
             scope=self.SCOPES,
             cache_path=config.cache_path,
-            open_browser=True,  # opens browser automatically on first run
+            open_browser=config.open_browser,
         )
 
         self._sp = spotipy.Spotify(auth_manager=auth_manager)

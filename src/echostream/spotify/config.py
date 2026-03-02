@@ -34,9 +34,19 @@ class SpotifyConfig:
         )
 
         # Where spotipy saves the access + refresh token locally.
-        # Points to the project root so it's easy to find (and .gitignore'd).
-        self.cache_path: str = str(
-            Path(__file__).parent.parent.parent.parent / ".spotify_cache"
+        # SPOTIFY_CACHE_PATH lets you override for Cloud Run (where the token
+        # comes from Secret Manager, copied to /tmp for write-back on refresh).
+        # Default: .spotify_cache at the project root (gitignored).
+        self.cache_path: str = os.getenv(
+            "SPOTIFY_CACHE_PATH",
+            str(Path(__file__).parent.parent.parent.parent / ".spotify_cache"),
+        )
+
+        # Whether to open the browser for OAuth approval.
+        # Set to "false" in headless environments (Cloud Run, CI).
+        # When false, spotipy relies on a cached token — it won't prompt.
+        self.open_browser: bool = (
+            os.getenv("SPOTIFY_OPEN_BROWSER", "true").lower() == "true"
         )
 
     def validate(self) -> None:

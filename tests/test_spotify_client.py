@@ -7,12 +7,12 @@ Why mock spotipy instead of calling the real API?
 - Fast: no network = no latency, no rate limits, no token expiry
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from echostream.spotify.config import SpotifyConfig
-from echostream.spotify.client import SpotifyClient
+import pytest
 
+from echostream.spotify.client import SpotifyClient
+from echostream.spotify.config import SpotifyConfig
 
 # ---------------------------------------------------------------------------
 # SpotifyConfig tests
